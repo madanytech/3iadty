@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>عيادتي — لوحة التحكم</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Arial, sans-serif; background: #f8fafc; color: #1e293b; }
+
+    /* Header */
+    .header {
+      background: white;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 0 1.5rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .header-logo { font-size: 1.25rem; font-weight: 700; color: #1a56db; }
+    .header-user { display: flex; align-items: center; gap: 12px; }
+    .user-email  { font-size: 0.875rem; color: #64748b; }
+    .btn-logout  {
+      padding: 6px 14px;
+      background: transparent;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      color: #64748b;
+    }
+    .btn-logout:hover { background: #f1f5f9; }
+
+    /* Main */
+    .main { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+    h2 { font-size: 1.4rem; margin-bottom: 1.5rem; }
+
+    /* Stats */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .stat-card {
+      background: white;
+      border-radius: 14px;
+      padding: 1.25rem;
+      border: 1px solid #e2e8f0;
+    }
+    .stat-label { font-size: 0.8rem; color: #64748b; margin-bottom: 6px; }
+    .stat-value { font-size: 1.5rem; font-weight: 700; }
+    .stat-value.blue  { color: #1a56db; }
+    .stat-value.green { color: #16a34a; }
+    .stat-value.amber { color: #d97706; }
+
+    /* Clinic Card */
+    .clinic-card {
+      background: white;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .clinic-header {
+      background: linear-gradient(135deg, #1a56db 0%, #3b82f6 100%);
+      padding: 1.5rem;
+      color: white;
+    }
+    .clinic-name { font-size: 1.3rem; font-weight: 700; }
+    .clinic-spec { font-size: 0.875rem; opacity: 0.85; margin-top: 4px; }
+
+    .clinic-body { padding: 1.25rem; }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #f1f5f9;
+      font-size: 0.9rem;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: #64748b; }
+    .info-value { font-weight: 500; }
+
+    /* Status badge */
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    .badge-trial    { background: #fef3c7; color: #92400e; }
+    .badge-active   { background: #dcfce7; color: #166534; }
+    .badge-pub      { background: #dbeafe; color: #1e40af; }
+    .badge-unpub    { background: #f3f4f6; color: #6b7280; }
+
+    /* Action buttons */
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; padding: 1.25rem; border-top: 1px solid #f1f5f9; }
+    .btn-primary {
+      flex: 1;
+      padding: 12px;
+      background: #1a56db;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      min-width: 140px;
+    }
+    .btn-primary:hover { background: #1648c0; }
+    .btn-secondary {
+      flex: 1;
+      padding: 12px;
+      background: transparent;
+      color: #1a56db;
+      border: 1.5px solid #1a56db;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-align: center;
+      text-decoration: none;
+      display: inline-block;
+      min-width: 140px;
+    }
+    .btn-secondary:hover { background: #eff6ff; }
+
+    /* Site link */
+    .site-link {
+      background: #f0f9ff;
+      border: 1px solid #bae6fd;
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+    }
+    .site-url { font-size: 0.875rem; color: #0369a1; word-break: break-all; }
+    .copy-btn {
+      padding: 6px 12px;
+      background: #0369a1;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      white-space: nowrap;
+      margin-right: 10px;
+    }
+
+    /* Trial notice */
+    .trial-notice {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .trial-text { font-size: 0.875rem; color: #92400e; }
+    .btn-upgrade {
+      padding: 8px 18px;
+      background: #d97706;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    /* Loading */
+    .loading { text-align: center; padding: 3rem; color: #94a3b8; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">🏥 عيادتي</div>
+  <div class="header-user">
+    <span class="user-email" id="user-email"></span>
+    <button class="btn-logout" onclick="logout()">خروج</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="loading" id="loading">جارٍ التحميل...</div>
+  <div id="content" style="display:none">
+
+    <h2 id="greeting">مرحباً 👋</h2>
+
+    <!-- إشعار الفترة التجريبية -->
+    <div class="trial-notice" id="trial-notice" style="display:none">
+      <div class="trial-text">
+        🕐 فترتك التجريبية تنتهي خلال <strong id="trial-days"></strong> يوم —
+        فعّل اشتراكك للاستمرار بدون انقطاع
+      </div>
+      <button class="btn-upgrade">ترقية الحساب</button>
+    </div>
+
+    <!-- رابط الموقع -->
+    <div class="site-link" id="site-link-box" style="display:none">
+      <span class="site-url" id="site-url"></span>
+      <button class="copy-btn" onclick="copyUrl()">نسخ الرابط</button>
+    </div>
+
+    <!-- الإحصائيات -->
+    <div class="stats">
+      <div class="stat-card">
+        <div class="stat-label">حالة الموقع</div>
+        <div class="stat-value" id="pub-status">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">الاشتراك</div>
+        <div class="stat-value" id="sub-status">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">القالب</div>
+        <div class="stat-value blue" id="template-name">—</div>
+      </div>
+    </div>
+
+    <!-- بطاقة العيادة -->
+    <div class="clinic-card">
+      <div class="clinic-header" id="clinic-header">
+        <div class="clinic-name" id="clinic-name">عيادة جديدة</div>
+        <div class="clinic-spec" id="clinic-spec">لم يتم إعداد العيادة بعد</div>
+      </div>
+      <div class="clinic-body">
+        <div class="info-row">
+          <span class="info-label">الطبيب</span>
+          <span class="info-value" id="info-doctor">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">التخصص</span>
+          <span class="info-value" id="info-spec">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">الهاتف</span>
+          <span class="info-value" id="info-phone">—</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">العنوان</span>
+          <span class="info-value" id="info-address">—</span>
+        </div>
+      </div>
+      <div class="actions">
+        <a href="editor.html" class="btn-primary">✏️ تعديل الموقع</a>
+        <button class="btn-secondary" onclick="publishSite()" id="pub-btn">🚀 نشر الموقع</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script>
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let clinic = null;
+
+const TEMPLATE_NAMES = { blue: 'الأزرق', green: 'الأخضر', dark: 'الداكن' };
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+
+  document.getElementById('user-email').textContent = session.user.email;
+
+  const { data, error } = await sb.from('clinics')
+    .select('*').eq('user_id', session.user.id).single();
+
+  if (error || !data) {
+    document.getElementById('loading').textContent = 'خطأ في تحميل البيانات. يرجى المحاولة مرة أخرى.';
+    return;
+  }
+
+  clinic = data;
+  renderClinic(data, session.user.email);
+}
+
+function renderClinic(c, email) {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('content').style.display = 'block';
+
+  const firstName = email.split('@')[0];
+  document.getElementById('greeting').textContent = `مرحباً ${firstName} 👋`;
+
+  // Trial notice
+  if (c.subscription_status === 'trial' && c.trial_ends_at) {
+    const days = Math.ceil((new Date(c.trial_ends_at) - new Date()) / 86400000);
+    if (days > 0) {
+      document.getElementById('trial-days').textContent = days;
+      document.getElementById('trial-notice').style.display = 'flex';
+    }
+  }
+
+  // Site link
+  if (c.is_published && c.subdomain) {
+    const url = `${WORKER_URL}/site/${c.subdomain}`;
+    document.getElementById('site-url').textContent = url;
+    document.getElementById('site-link-box').style.display = 'flex';
+  }
+
+  // Stats
+  const pubEl = document.getElementById('pub-status');
+  pubEl.textContent = c.is_published ? 'منشور' : 'غير منشور';
+  pubEl.style.color = c.is_published ? '#16a34a' : '#9ca3af';
+
+  const subEl = document.getElementById('sub-status');
+  const subMap = { trial:'تجريبي', active:'نشط', cancelled:'ملغى', expired:'منتهي' };
+  subEl.textContent = subMap[c.subscription_status] || c.subscription_status;
+  subEl.style.color = c.subscription_status === 'active' ? '#16a34a' : '#d97706';
+
+  document.getElementById('template-name').textContent = TEMPLATE_NAMES[c.template_id] || c.template_id;
+
+  // Clinic info
+  if (c.clinic_name) document.getElementById('clinic-name').textContent = c.clinic_name;
+  if (c.specialty)   document.getElementById('clinic-spec').textContent = c.specialty;
+  document.getElementById('info-doctor').textContent  = c.doctor_name || 'لم يُحدَّد';
+  document.getElementById('info-spec').textContent    = c.specialty   || 'لم يُحدَّد';
+  document.getElementById('info-phone').textContent   = c.phone       || 'لم يُحدَّد';
+  document.getElementById('info-address').textContent = c.address     || 'لم يُحدَّد';
+
+  // Publish button
+  const pubBtn = document.getElementById('pub-btn');
+  if (c.is_published) {
+    pubBtn.textContent = '⏸ إلغاء النشر';
+    pubBtn.style.borderColor = '#dc2626';
+    pubBtn.style.color = '#dc2626';
+  }
+}
+
+async function publishSite() {
+  if (!clinic) return;
+  const newStatus = !clinic.is_published;
+  const btn = document.getElementById('pub-btn');
+  btn.disabled = true;
+
+  const { error } = await sb.from('clinics')
+    .update({ is_published: newStatus })
+    .eq('id', clinic.id);
+
+  if (!error) {
+    clinic.is_published = newStatus;
+    renderClinic(clinic, document.getElementById('user-email').textContent);
+    btn.disabled = false;
+    alert(newStatus ? '✅ تم نشر موقعك بنجاح!' : 'تم إلغاء النشر');
+  }
+}
+
+function copyUrl() {
+  const url = document.getElementById('site-url').textContent;
+  navigator.clipboard.writeText(url).then(() => alert('تم نسخ الرابط!'));
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  window.location.href = 'login.html';
+}
+
+init();
+</script>
+</body>
+</html>

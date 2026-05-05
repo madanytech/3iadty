@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>عيادتي — تسجيل الدخول</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f0f4ff;min-height:100vh;display:flex;align-items:center;justify-content:center;flex-direction:column;padding:1rem;gap:1rem}
+    .back-link{font-size:.85rem;color:#64748b;text-decoration:none}
+    .back-link:hover{color:#1a56db}
+    .card{background:#fff;border-radius:16px;padding:2rem;width:100%;max-width:400px;box-shadow:0 4px 24px rgba(0,0,0,.08)}
+    .logo{text-align:center;margin-bottom:1.5rem}
+    .logo h1{font-size:1.6rem;color:#1a56db}
+    .logo p{font-size:.875rem;color:#6b7280;margin-top:4px}
+    .tabs{display:flex;border-radius:10px;background:#f3f4f6;padding:4px;margin-bottom:1.5rem;gap:4px}
+    .tab{flex:1;padding:8px;border:none;background:transparent;border-radius:8px;font-size:.875rem;cursor:pointer;color:#6b7280;transition:all .2s}
+    .tab.active{background:#fff;color:#1a56db;font-weight:600}
+    label{display:block;font-size:.875rem;color:#374151;margin-bottom:4px}
+    input[type=email],input[type=password]{width:100%;padding:10px 14px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:.95rem;margin-bottom:1rem;outline:none;transition:border-color .2s}
+    input:focus{border-color:#1a56db}
+    .turnstile-wrap{margin-bottom:1rem;display:flex;justify-content:center}
+    .btn{width:100%;padding:12px;background:#1a56db;color:#fff;border:none;border-radius:10px;font-size:1rem;font-weight:600;cursor:pointer;transition:background .2s}
+    .btn:hover{background:#1648c0}
+    .btn:disabled{background:#93c5fd;cursor:not-allowed}
+    .msg{margin-top:1rem;padding:10px 14px;border-radius:10px;font-size:.875rem;display:none}
+    .msg.error{background:#fef2f2;color:#dc2626;display:block}
+    .msg.success{background:#f0fdf4;color:#16a34a;display:block}
+    .divider{text-align:center;font-size:.8rem;color:#9ca3af;margin:.75rem 0}
+  </style>
+</head>
+<body>
+
+<a href="index.html" class="back-link">→ العودة للصفحة الرئيسية</a>
+
+<div class="card">
+  <div class="logo">
+    <h1>🏥 عيادتي</h1>
+    <p>منصة المواقع الطبية الاحترافية</p>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('login')">تسجيل الدخول</button>
+    <button class="tab"        onclick="showTab('signup')">حساب جديد</button>
+  </div>
+
+  <div id="form-login">
+    <label>البريد الإلكتروني</label>
+    <input type="email" id="login-email" placeholder="doctor@example.com">
+    <label>كلمة المرور</label>
+    <input type="password" id="login-pass" placeholder="••••••••">
+    <div class="turnstile-wrap">
+      <div class="cf-turnstile" data-sitekey="TURNSTILE_SITE_KEY_HERE" data-theme="light"></div>
+    </div>
+    <button class="btn" onclick="login()">دخول</button>
+  </div>
+
+  <div id="form-signup" style="display:none">
+    <label>البريد الإلكتروني</label>
+    <input type="email" id="signup-email" placeholder="doctor@example.com">
+    <label>كلمة المرور (8 أحرف على الأقل)</label>
+    <input type="password" id="signup-pass" placeholder="••••••••">
+    <div class="turnstile-wrap">
+      <div class="cf-turnstile" data-sitekey="TURNSTILE_SITE_KEY_HERE" data-theme="light"></div>
+    </div>
+    <button class="btn" onclick="signup()">إنشاء الحساب مجاناً</button>
+    <div class="divider">14 يوم تجريبي — بدون بطاقة</div>
+  </div>
+
+  <div id="msg" class="msg"></div>
+</div>
+
+<script src="config.js"></script>
+<script>
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+if (window.location.hash === '#signup') showTab('signup');
+sb.auth.getSession().then(({ data }) => {
+  if (data.session) window.location.href = 'dashboard.html';
+});
+
+function showTab(tab) {
+  document.getElementById('form-login').style.display  = tab === 'login'  ? 'block' : 'none';
+  document.getElementById('form-signup').style.display = tab === 'signup' ? 'block' : 'none';
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    t.classList.toggle('active', (tab==='login'&&i===0)||(tab==='signup'&&i===1));
+  });
+  clearMsg();
+}
+function showMsg(text, type) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg ' + type;
+}
+function clearMsg() { document.getElementById('msg').className = 'msg'; }
+
+function getTurnstileToken() {
+  return window.turnstile?.getResponse() || null;
+}
+
+async function verifyTurnstile(token) {
+  if (!token) return false;
+  try {
+    const res = await fetch(`${WORKER_URL}/api/verify-turnstile`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token })
+    });
+    const data = await res.json();
+    return data.success === true;
+  } catch { return false; }
+}
+
+async function login() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  if (!email || !pass) return showMsg('يرجى تعبئة جميع الحقول', 'error');
+
+  const token = getTurnstileToken();
+  if (!token) return showMsg('يرجى إكمال التحقق أولاً', 'error');
+
+  const btn = document.querySelector('#form-login .btn');
+  btn.disabled = true; btn.textContent = 'جارٍ التحقق...';
+
+  const valid = await verifyTurnstile(token);
+  if (!valid) {
+    showMsg('فشل التحقق. أعد المحاولة.', 'error');
+    btn.disabled = false; btn.textContent = 'دخول';
+    window.turnstile?.reset(); return;
+  }
+
+  btn.textContent = 'جارٍ الدخول...';
+  const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+  if (error) {
+    showMsg('بيانات غير صحيحة.', 'error');
+    btn.disabled = false; btn.textContent = 'دخول';
+    window.turnstile?.reset();
+  } else {
+    window.location.href = 'dashboard.html';
+  }
+}
+
+async function signup() {
+  const email = document.getElementById('signup-email').value.trim();
+  const pass  = document.getElementById('signup-pass').value;
+  if (!email || !pass) return showMsg('يرجى تعبئة جميع الحقول', 'error');
+  if (pass.length < 8) return showMsg('كلمة المرور 8 أحرف على الأقل', 'error');
+
+  const token = getTurnstileToken();
+  if (!token) return showMsg('يرجى إكمال التحقق أولاً', 'error');
+
+  const btn = document.querySelector('#form-signup .btn');
+  btn.disabled = true; btn.textContent = 'جارٍ التحقق...';
+
+  const valid = await verifyTurnstile(token);
+  if (!valid) {
+    showMsg('فشل التحقق. أعد المحاولة.', 'error');
+    btn.disabled = false; btn.textContent = 'إنشاء الحساب مجاناً';
+    window.turnstile?.reset(); return;
+  }
+
+  btn.textContent = 'جارٍ الإنشاء...';
+  const { data, error } = await sb.auth.signUp({ email, password: pass });
+
+  if (error) {
+    showMsg('حدث خطأ: ' + error.message, 'error');
+    btn.disabled = false; btn.textContent = 'إنشاء الحساب مجاناً';
+    window.turnstile?.reset();
+  } else {
+    // أرسل إيميل الترحيب عبر Worker (لا نوقف التسجيل إن فشل)
+    if (data?.user) {
+      fetch(`${WORKER_URL}/api/send-welcome`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, userId: data.user.id })
+      }).catch(() => {});
+    }
+    showMsg('تم! تحقق من بريدك لتفعيل حسابك ثم ادخل.', 'success');
+    btn.disabled = false; btn.textContent = 'إنشاء الحساب مجاناً';
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (document.getElementById('form-login').style.display !== 'none') login();
+  else signup();
+});
+</script>
+</body>
+</html>

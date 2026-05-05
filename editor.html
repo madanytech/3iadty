@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>عيادتي — تعديل الموقع</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f8fafc;color:#1e293b}
+    .header{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 1.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .header-left{display:flex;align-items:center;gap:12px}
+    .back-btn{padding:6px 14px;background:transparent;border:1px solid #e2e8f0;border-radius:8px;font-size:.85rem;cursor:pointer;color:#475569;text-decoration:none}
+    .header-title{font-size:1rem;font-weight:600}
+    .save-btn{padding:8px 22px;background:#1a56db;color:#fff;border:none;border-radius:10px;font-size:.9rem;font-weight:600;cursor:pointer}
+    .save-btn:hover{background:#1648c0}
+    .save-btn:disabled{background:#93c5fd;cursor:not-allowed}
+    .layout{display:grid;grid-template-columns:380px 1fr;height:calc(100vh - 60px)}
+    .form-panel{overflow-y:auto;border-left:1px solid #e2e8f0;background:#fff}
+    .section{padding:1.25rem 1.5rem;border-bottom:1px solid #f1f5f9}
+    .section-title{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#94a3b8;margin-bottom:1rem}
+    label{display:block;font-size:.875rem;color:#475569;margin-bottom:4px;margin-top:10px}
+    label:first-of-type{margin-top:0}
+    input[type=text],input[type=tel],textarea{width:100%;padding:9px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.9rem;font-family:inherit;outline:none;transition:border-color .2s;background:#fff}
+    input:focus,textarea:focus{border-color:#1a56db}
+    textarea{resize:vertical;min-height:80px}
+    .templates{display:flex;flex-direction:column;gap:8px}
+    .template-opt{display:flex;align-items:center;gap:12px;padding:10px 12px;border:2px solid #e2e8f0;border-radius:10px;cursor:pointer;transition:all .2s}
+    .template-opt.active{border-color:#1a56db;background:#eff6ff}
+    .template-color{width:32px;height:32px;border-radius:50%;flex-shrink:0}
+    .template-info{flex:1}
+    .template-name{font-size:.9rem;font-weight:600}
+    .template-desc{font-size:.75rem;color:#94a3b8;margin-top:2px}
+    .template-check{width:20px;height:20px;border-radius:50%;background:#1a56db;color:#fff;display:none;align-items:center;justify-content:center;font-size:12px}
+    .template-opt.active .template-check{display:flex}
+
+    /* Logo Upload */
+    .logo-upload-area{border:2px dashed #e2e8f0;border-radius:10px;padding:1rem;text-align:center;cursor:pointer;transition:all .2s;position:relative}
+    .logo-upload-area:hover{border-color:#1a56db;background:#f8fbff}
+    .logo-upload-area.dragover{border-color:#1a56db;background:#eff6ff}
+    .logo-upload-area input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+    .logo-preview-img{max-height:70px;max-width:200px;margin-bottom:8px;border-radius:6px}
+    .logo-hint{font-size:.8rem;color:#94a3b8}
+    .logo-uploading{font-size:.85rem;color:#1a56db;margin-top:6px}
+    .logo-clear{display:inline-block;margin-top:6px;font-size:.75rem;color:#dc2626;cursor:pointer;text-decoration:underline;background:none;border:none;padding:0}
+
+    .preview-panel{overflow-y:auto;background:#f1f5f9;padding:1.5rem}
+    .preview-label{text-align:center;font-size:.75rem;color:#94a3b8;margin-bottom:1rem;font-weight:500;text-transform:uppercase;letter-spacing:.05em}
+    .preview-frame{background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.08);max-width:680px;margin:0 auto}
+    .site-hero{padding:2.5rem 2rem 2rem;color:#fff;text-align:center}
+    .site-hero img{max-height:70px;margin-bottom:1rem;border-radius:8px}
+    .site-hero h1{font-size:1.6rem;margin-bottom:4px}
+    .site-hero p{font-size:.95rem;opacity:.9}
+    .site-body{padding:1.5rem 2rem}
+    .site-section{margin-bottom:1.5rem}
+    .site-section h3{font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.75rem}
+    .site-about{font-size:.9rem;color:#475569;line-height:1.7}
+    .services-grid{display:flex;flex-wrap:wrap;gap:8px}
+    .service-tag{padding:6px 14px;border-radius:20px;font-size:.8rem;font-weight:500}
+    .contact-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f8fafc;border-radius:10px;font-size:.875rem;margin-bottom:8px}
+    .whatsapp-btn{display:block;width:100%;padding:14px;text-align:center;color:#fff;background:#25d366;border-radius:12px;font-weight:700;font-size:1rem;margin-top:1.5rem}
+    .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 24px;border-radius:30px;font-size:.9rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+    .toast.show{opacity:1}
+    @media(max-width:700px){.layout{grid-template-columns:1fr;height:auto}.preview-panel{display:none}}
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <a href="dashboard.html" class="back-btn">→ الداشبورد</a>
+    <span class="header-title">تخصيص الموقع</span>
+  </div>
+  <button class="save-btn" id="save-btn" onclick="save()">💾 حفظ التغييرات</button>
+</div>
+
+<div class="layout">
+  <div class="form-panel">
+
+    <!-- القوالب -->
+    <div class="section">
+      <div class="section-title">اختر القالب</div>
+      <div class="templates">
+        <div class="template-opt active" onclick="selectTemplate('blue')" data-id="blue">
+          <div class="template-color" style="background:#1a56db"></div>
+          <div class="template-info"><div class="template-name">الأزرق الكلاسيكي</div><div class="template-desc">احترافي — لجميع التخصصات</div></div>
+          <div class="template-check">✓</div>
+        </div>
+        <div class="template-opt" onclick="selectTemplate('green')" data-id="green">
+          <div class="template-color" style="background:#057a55"></div>
+          <div class="template-info"><div class="template-name">الأخضر الصحي</div><div class="template-desc">طبيعي — أطباء الأطفال والعائلة</div></div>
+          <div class="template-check">✓</div>
+        </div>
+        <div class="template-opt" onclick="selectTemplate('dark')" data-id="dark">
+          <div class="template-color" style="background:#1f2937"></div>
+          <div class="template-info"><div class="template-name">الداكن الفاخر</div><div class="template-desc">أنيق — عيادات التجميل والليزر</div></div>
+          <div class="template-check">✓</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- شعار العيادة -->
+    <div class="section">
+      <div class="section-title">شعار العيادة</div>
+      <div class="logo-upload-area" id="logo-area" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        <input type="file" id="logo-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" onchange="uploadLogo(this.files[0])">
+        <div id="logo-preview-wrap">
+          <div class="logo-hint">اسحب شعارك هنا أو اضغط للاختيار<br><span style="font-size:.75rem">PNG, JPG, SVG — حجم أقصى 2MB</span></div>
+        </div>
+        <div class="logo-uploading" id="logo-status" style="display:none"></div>
+      </div>
+    </div>
+
+    <!-- معلومات العيادة -->
+    <div class="section">
+      <div class="section-title">معلومات العيادة</div>
+      <label>اسم العيادة *</label>
+      <input type="text" id="f-clinic-name" placeholder="عيادة الدكتور أحمد" oninput="updatePreview()">
+      <label>اسم الطبيب *</label>
+      <input type="text" id="f-doctor-name" placeholder="د. أحمد محمد" oninput="updatePreview()">
+      <label>التخصص *</label>
+      <input type="text" id="f-specialty" placeholder="طب الأسنان — تقويم — زراعة" oninput="updatePreview()">
+      <label>نبذة عن العيادة</label>
+      <textarea id="f-about" placeholder="أكثر من 10 سنوات خبرة..." oninput="updatePreview()"></textarea>
+    </div>
+
+    <!-- الخدمات -->
+    <div class="section">
+      <div class="section-title">الخدمات (افصل بينها بفاصلة)</div>
+      <textarea id="f-services" placeholder="تنظيف الأسنان, تبييض, تقويم, زراعة" oninput="updatePreview()"></textarea>
+    </div>
+
+    <!-- التواصل -->
+    <div class="section">
+      <div class="section-title">بيانات التواصل</div>
+      <label>رقم الهاتف</label>
+      <input type="tel" id="f-phone" placeholder="+966 5X XXX XXXX" oninput="updatePreview()">
+      <label>رقم واتساب</label>
+      <input type="tel" id="f-whatsapp" placeholder="+966 5X XXX XXXX" oninput="updatePreview()">
+      <label>العنوان</label>
+      <input type="text" id="f-address" placeholder="شارع الملك فهد، الرياض" oninput="updatePreview()">
+      <label>المدينة</label>
+      <input type="text" id="f-city" placeholder="الرياض" oninput="updatePreview()">
+      <label>ساعات العمل</label>
+      <input type="text" id="f-hours" placeholder="السبت - الخميس: 9 ص - 9 م" oninput="updatePreview()">
+    </div>
+
+  </div>
+
+  <!-- المعاينة -->
+  <div class="preview-panel">
+    <div class="preview-label">معاينة مباشرة</div>
+    <div class="preview-frame" id="preview"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let clinicId = null;
+let selectedTemplate = 'blue';
+let currentLogoUrl = '';
+
+const TEMPLATES = {
+  blue:  { color:'#1a56db', tag:'#dbeafe', tagText:'#1e40af' },
+  green: { color:'#057a55', tag:'#dcfce7', tagText:'#166534' },
+  dark:  { color:'#1f2937', tag:'#e5e7eb', tagText:'#374151' }
+};
+
+// ============================================================
+// تحميل الشعار إلى Cloudinary عبر Worker
+// ============================================================
+async function uploadLogo(file) {
+  if (!file) return;
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('❌ حجم الصورة أكبر من 2MB', true); return;
+  }
+
+  setLogoStatus('⏳ جارٍ الرفع...', true);
+
+  try {
+    // 1. اطلب توقيع رفع من Worker
+    const { data: { session } } = await sb.auth.getSession();
+    const sigRes = await fetch(`${WORKER_URL}/api/cloudinary-signature`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`
+      },
+      body: JSON.stringify({ folder: `clinics/${clinicId}` })
+    });
+    const sig = await sigRes.json();
+    if (!sig.signature) throw new Error('فشل الحصول على توقيع الرفع');
+
+    // 2. ارفع الصورة مباشرة لـ Cloudinary
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('api_key',   sig.api_key);
+    formData.append('timestamp', sig.timestamp);
+    formData.append('signature', sig.signature);
+    formData.append('folder',    sig.folder);
+    formData.append('transformation', 'w_400,h_200,c_fit,f_auto,q_auto');
+
+    const uploadRes = await fetch(
+      `https://api.cloudinary.com/v1_1/${sig.cloud_name}/image/upload`,
+      { method: 'POST', body: formData }
+    );
+    const uploaded = await uploadRes.json();
+    if (!uploaded.secure_url) throw new Error('فشل رفع الصورة');
+
+    // 3. احفظ الـ URL في قاعدة البيانات
+    currentLogoUrl = uploaded.secure_url;
+    await sb.from('clinics').update({ logo_url: currentLogoUrl }).eq('id', clinicId);
+
+    // 4. أظهر المعاينة
+    renderLogoPreview(currentLogoUrl);
+    updatePreview();
+    setLogoStatus('', false);
+    showToast('✅ تم رفع الشعار بنجاح!');
+
+  } catch (err) {
+    setLogoStatus('', false);
+    showToast('❌ فشل رفع الشعار: ' + err.message, true);
+  }
+}
+
+function setLogoStatus(msg, show) {
+  const el = document.getElementById('logo-status');
+  el.textContent = msg;
+  el.style.display = show ? 'block' : 'none';
+  document.getElementById('logo-input').disabled = show;
+}
+
+function renderLogoPreview(url) {
+  document.getElementById('logo-preview-wrap').innerHTML = `
+    <img class="logo-preview-img" src="${url}" alt="شعار العيادة">
+    <br>
+    <button class="logo-clear" onclick="clearLogo()">حذف الشعار</button>
+  `;
+}
+
+async function clearLogo() {
+  currentLogoUrl = '';
+  await sb.from('clinics').update({ logo_url: '' }).eq('id', clinicId);
+  document.getElementById('logo-preview-wrap').innerHTML =
+    `<div class="logo-hint">اسحب شعارك هنا أو اضغط للاختيار<br><span style="font-size:.75rem">PNG, JPG, SVG — حجم أقصى 2MB</span></div>`;
+  updatePreview();
+}
+
+// Drag & Drop
+function onDragOver(e) { e.preventDefault(); document.getElementById('logo-area').classList.add('dragover'); }
+function onDragLeave()  { document.getElementById('logo-area').classList.remove('dragover'); }
+function onDrop(e)      { e.preventDefault(); onDragLeave(); const f = e.dataTransfer.files[0]; if(f) uploadLogo(f); }
+
+// ============================================================
+// تهيئة الصفحة
+// ============================================================
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+
+  const { data, error } = await sb.from('clinics').select('*').eq('user_id', session.user.id).single();
+  if (error || !data) { alert('خطأ في تحميل البيانات'); return; }
+
+  clinicId = data.id;
+  setValue('f-clinic-name', data.clinic_name);
+  setValue('f-doctor-name', data.doctor_name);
+  setValue('f-specialty',   data.specialty);
+  setValue('f-about',       data.about);
+  setValue('f-services',    data.services);
+  setValue('f-phone',       data.phone);
+  setValue('f-whatsapp',    data.whatsapp);
+  setValue('f-address',     data.address);
+  setValue('f-city',        data.city);
+  setValue('f-hours',       data.working_hours);
+
+  if (data.logo_url) {
+    currentLogoUrl = data.logo_url;
+    renderLogoPreview(data.logo_url);
+  }
+
+  selectTemplate(data.template_id || 'blue');
+  updatePreview();
+}
+
+function setValue(id, val) { if (val) document.getElementById(id).value = val; }
+
+function selectTemplate(id) {
+  selectedTemplate = id;
+  document.querySelectorAll('.template-opt').forEach(el => {
+    el.classList.toggle('active', el.dataset.id === id);
+  });
+  updatePreview();
+}
+
+function getFormData() {
+  return {
+    clinic_name:   document.getElementById('f-clinic-name').value || 'اسم العيادة',
+    doctor_name:   document.getElementById('f-doctor-name').value || 'اسم الطبيب',
+    specialty:     document.getElementById('f-specialty').value   || 'التخصص',
+    about:         document.getElementById('f-about').value,
+    services:      document.getElementById('f-services').value,
+    phone:         document.getElementById('f-phone').value,
+    whatsapp:      document.getElementById('f-whatsapp').value,
+    address:       document.getElementById('f-address').value,
+    city:          document.getElementById('f-city').value,
+    working_hours: document.getElementById('f-hours').value,
+    template_id:   selectedTemplate,
+    logo_url:      currentLogoUrl
+  };
+}
+
+function updatePreview() {
+  const d = getFormData();
+  const t = TEMPLATES[selectedTemplate];
+  const services = d.services
+    ? d.services.split(',').map(s => s.trim()).filter(Boolean)
+    : ['الخدمة الأولى', 'الخدمة الثانية', 'الخدمة الثالثة'];
+
+  document.getElementById('preview').innerHTML = `
+    <div class="site-hero" style="background:${t.color}">
+      ${d.logo_url ? `<img src="${d.logo_url}" alt="شعار العيادة">` : ''}
+      <h1>${d.clinic_name}</h1>
+      <p>${d.doctor_name} — ${d.specialty}</p>
+    </div>
+    <div class="site-body">
+      ${d.about ? `<div class="site-section"><h3 style="color:${t.color}">عن العيادة</h3><p class="site-about">${d.about}</p></div>` : ''}
+      <div class="site-section">
+        <h3 style="color:${t.color}">خدماتنا</h3>
+        <div class="services-grid">${services.map(s=>`<span class="service-tag" style="background:${t.tag};color:${t.tagText}">${s}</span>`).join('')}</div>
+      </div>
+      <div class="site-section">
+        <h3 style="color:${t.color}">تواصل معنا</h3>
+        ${d.phone    ? `<div class="contact-item">📞 ${d.phone}</div>` : ''}
+        ${d.address  ? `<div class="contact-item">📍 ${d.address}${d.city?'، '+d.city:''}</div>` : ''}
+        ${d.working_hours ? `<div class="contact-item">🕐 ${d.working_hours}</div>` : ''}
+        ${d.whatsapp ? `<div class="whatsapp-btn">💬 احجز موعدك عبر واتساب</div>` : ''}
+      </div>
+    </div>`;
+}
+
+async function save() {
+  if (!clinicId) return;
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'جارٍ الحفظ...';
+  const { error } = await sb.from('clinics').update(getFormData()).eq('id', clinicId);
+  btn.disabled = false; btn.textContent = '💾 حفظ التغييرات';
+  showToast(error ? '❌ حدث خطأ، حاول مجدداً' : '✅ تم الحفظ بنجاح!', !!error);
+}
+
+function showToast(msg, isError = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = isError ? '#dc2626' : '#1e293b';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+init();
+</script>
+</body>
+</html>
