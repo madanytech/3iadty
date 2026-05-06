@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>عيادتي — لوحة الأدمن</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+
+    /* Sidebar */
+    .layout{display:grid;grid-template-columns:220px 1fr;min-height:100vh}
+    .sidebar{background:#1e293b;border-left:1px solid #334155;padding:1.5rem 0;display:flex;flex-direction:column}
+    .sidebar-logo{padding:0 1.5rem 1.5rem;border-bottom:1px solid #334155;margin-bottom:1rem}
+    .sidebar-logo h1{font-size:1.1rem;font-weight:700;color:#38bdf8}
+    .sidebar-logo p{font-size:.75rem;color:#64748b;margin-top:2px}
+    .nav-item{display:flex;align-items:center;gap:10px;padding:10px 1.5rem;font-size:.875rem;color:#94a3b8;cursor:pointer;transition:all .15s;border-right:3px solid transparent}
+    .nav-item:hover{background:#334155;color:#e2e8f0}
+    .nav-item.active{background:#1e40af22;color:#38bdf8;border-right-color:#38bdf8}
+    .nav-icon{font-size:1rem;width:20px;text-align:center}
+    .sidebar-footer{margin-top:auto;padding:1rem 1.5rem;border-top:1px solid #334155}
+    .admin-info{font-size:.75rem;color:#64748b}
+    .btn-logout-admin{margin-top:8px;padding:6px 12px;background:transparent;border:1px solid #334155;border-radius:8px;font-size:.75rem;color:#64748b;cursor:pointer;width:100%}
+    .btn-logout-admin:hover{border-color:#ef4444;color:#ef4444}
+
+    /* Main */
+    .main{overflow-y:auto;background:#0f172a}
+    .topbar{padding:1rem 1.5rem;border-bottom:1px solid #1e293b;display:flex;align-items:center;justify-content:space-between}
+    .topbar h2{font-size:1.1rem;font-weight:600;color:#f1f5f9}
+    .topbar-right{display:flex;align-items:center;gap:10px}
+    .refresh-btn{padding:6px 14px;background:#1e293b;border:1px solid #334155;border-radius:8px;font-size:.8rem;color:#94a3b8;cursor:pointer}
+    .refresh-btn:hover{border-color:#38bdf8;color:#38bdf8}
+    .last-updated{font-size:.75rem;color:#475569}
+
+    .content{padding:1.5rem}
+
+    /* Views */
+    .view{display:none}.view.active{display:block}
+
+    /* Stats Grid */
+    .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:1.5rem}
+    .stat-card{background:#1e293b;border-radius:12px;padding:1.1rem;border:1px solid #334155}
+    .stat-label{font-size:.75rem;color:#64748b;margin-bottom:6px}
+    .stat-value{font-size:1.75rem;font-weight:700}
+    .stat-sub{font-size:.75rem;color:#475569;margin-top:4px}
+    .c-blue{color:#38bdf8}.c-green{color:#4ade80}.c-amber{color:#fbbf24}.c-red{color:#f87171}.c-purple{color:#c084fc}.c-gray{color:#94a3b8}
+
+    /* Chart bar */
+    .mini-chart{display:flex;align-items:flex-end;gap:4px;height:60px;margin-top:8px}
+    .bar{flex:1;background:#38bdf8;border-radius:3px 3px 0 0;min-height:4px;transition:height .3s}
+    .bar.g{background:#4ade80}.bar.a{background:#fbbf24}.bar.r{background:#f87171}
+
+    /* Section headers */
+    .section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+    .section-title{font-size:.95rem;font-weight:600;color:#f1f5f9}
+    .section-count{font-size:.8rem;color:#64748b;padding:3px 10px;background:#1e293b;border-radius:20px;border:1px solid #334155}
+
+    /* Search + Filter bar */
+    .filter-bar{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap}
+    .search-input{flex:1;min-width:200px;padding:8px 14px;background:#1e293b;border:1px solid #334155;border-radius:8px;font-size:.875rem;color:#e2e8f0;outline:none}
+    .search-input::placeholder{color:#475569}
+    .search-input:focus{border-color:#38bdf8}
+    .filter-select{padding:8px 12px;background:#1e293b;border:1px solid #334155;border-radius:8px;font-size:.875rem;color:#e2e8f0;outline:none;cursor:pointer}
+
+    /* Table */
+    .table-wrap{background:#1e293b;border-radius:12px;border:1px solid #334155;overflow:hidden}
+    table{width:100%;border-collapse:collapse;font-size:.825rem}
+    th{padding:10px 14px;text-align:right;font-size:.75rem;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #334155;background:#161f2e}
+    td{padding:11px 14px;border-bottom:1px solid #1e2d3d;color:#cbd5e1;vertical-align:middle}
+    tr:last-child td{border-bottom:none}
+    tr:hover td{background:#1a2535}
+
+    /* Badges */
+    .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600}
+    .b-trial{background:#451a0322;color:#fbbf24;border:1px solid #78350f}
+    .b-active{background:#14532d22;color:#4ade80;border:1px solid #166534}
+    .b-expired{background:#450a0a22;color:#f87171;border:1px solid #7f1d1d}
+    .b-cancelled{background:#1e293b;color:#64748b;border:1px solid #334155}
+    .b-pub{background:#0c4a6e22;color:#38bdf8;border:1px solid #0369a1}
+    .b-unpub{background:#1e293b;color:#475569;border:1px solid #334155}
+    .b-paid{background:#14532d22;color:#4ade80;border:1px solid #166534}
+    .b-pending{background:#451a0322;color:#fbbf24;border:1px solid #78350f}
+    .b-failed{background:#450a0a22;color:#f87171;border:1px solid #7f1d1d}
+
+    /* Action buttons in table */
+    .tbl-btn{padding:4px 10px;border-radius:6px;font-size:.75rem;cursor:pointer;border:1px solid #334155;background:transparent;color:#94a3b8;transition:all .15s}
+    .tbl-btn:hover{border-color:#38bdf8;color:#38bdf8}
+    .tbl-btn.danger:hover{border-color:#f87171;color:#f87171}
+    .actions-cell{display:flex;gap:6px;flex-wrap:wrap}
+
+    /* Modal */
+    .modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.7);display:none;align-items:center;justify-content:center;z-index:1000;padding:1rem}
+    .modal-backdrop.open{display:flex}
+    .modal{background:#1e293b;border-radius:16px;border:1px solid #334155;padding:1.5rem;width:100%;max-width:480px;max-height:90vh;overflow-y:auto}
+    .modal h3{font-size:1rem;font-weight:600;margin-bottom:1rem;color:#f1f5f9}
+    .modal-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #334155;font-size:.875rem}
+    .modal-row:last-of-type{border-bottom:none}
+    .modal-label{color:#64748b}
+    .modal-value{color:#e2e8f0;font-weight:500;text-align:left}
+    .modal-actions{display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap}
+    .modal-btn{flex:1;padding:9px;border-radius:8px;font-size:.875rem;font-weight:600;cursor:pointer;border:none;min-width:100px}
+    .modal-btn.primary{background:#1d4ed8;color:#fff}
+    .modal-btn.success{background:#15803d;color:#fff}
+    .modal-btn.danger{background:#b91c1c;color:#fff}
+    .modal-btn.neutral{background:#334155;color:#e2e8f0}
+    .modal-btn:hover{opacity:.85}
+    .modal-close{float:left;background:transparent;border:none;color:#64748b;font-size:1.1rem;cursor:pointer;padding:0}
+
+    /* Empty state */
+    .empty{text-align:center;padding:3rem;color:#475569}
+
+    /* Loading */
+    .loading-row td{text-align:center;padding:2rem;color:#475569}
+
+    /* Invoice card */
+    .inv-row{display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid #1e2d3d}
+    .inv-row:last-child{border-bottom:none}
+    .inv-left{display:flex;flex-direction:column;gap:3px}
+    .inv-name{font-size:.875rem;color:#e2e8f0;font-weight:500}
+    .inv-meta{font-size:.75rem;color:#64748b}
+    .inv-amount{font-size:1rem;font-weight:700;color:#4ade80}
+
+    /* Toast */
+    .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#334155;color:#e2e8f0;padding:10px 20px;border-radius:30px;font-size:.875rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999}
+    .toast.show{opacity:1}
+  </style>
+</head>
+<body>
+
+<div class="layout">
+  <!-- Sidebar -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <h1>🏥 عيادتي</h1>
+      <p>لوحة الأدمن</p>
+    </div>
+    <div class="nav-item active" onclick="showView('overview')"><span class="nav-icon">📊</span>نظرة عامة</div>
+    <div class="nav-item" onclick="showView('clinics')"><span class="nav-icon">🏥</span>العيادات</div>
+    <div class="nav-item" onclick="showView('invoices')"><span class="nav-icon">💰</span>الفواتير</div>
+    <div class="nav-item" onclick="showView('expiring')"><span class="nav-icon">⏰</span>تنتهي قريباً</div>
+    <div class="sidebar-footer">
+      <div class="admin-info" id="admin-email">جارٍ التحميل...</div>
+      <button class="btn-logout-admin" onclick="logout()">تسجيل الخروج</button>
+    </div>
+  </div>
+
+  <!-- Main -->
+  <div class="main">
+    <div class="topbar">
+      <h2 id="view-title">نظرة عامة</h2>
+      <div class="topbar-right">
+        <span class="last-updated" id="last-updated"></span>
+        <button class="refresh-btn" onclick="loadAll()">↻ تحديث</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- ======= OVERVIEW ======= -->
+      <div class="view active" id="view-overview">
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card"><div class="stat-label">إجمالي الحسابات</div><div class="stat-value c-blue" id="s-total">—</div></div>
+          <div class="stat-card"><div class="stat-label">تجريبية نشطة</div><div class="stat-value c-amber" id="s-trial">—</div></div>
+          <div class="stat-card"><div class="stat-label">مشتركون مدفوعون</div><div class="stat-value c-green" id="s-active">—</div></div>
+          <div class="stat-card"><div class="stat-label">منتهية / ملغاة</div><div class="stat-value c-red" id="s-expired">—</div></div>
+          <div class="stat-card"><div class="stat-label">مواقع منشورة</div><div class="stat-value c-purple" id="s-pub">—</div></div>
+          <div class="stat-card"><div class="stat-label">جديد اليوم</div><div class="stat-value c-blue" id="s-today">—</div></div>
+          <div class="stat-card"><div class="stat-label">جديد هذا الأسبوع</div><div class="stat-value c-blue" id="s-week">—</div></div>
+          <div class="stat-card"><div class="stat-label">إجمالي الفواتير</div><div class="stat-value c-green" id="s-revenue">—</div></div>
+        </div>
+
+        <!-- آخر 5 تسجيلات -->
+        <div class="section-head" style="margin-top:1.5rem">
+          <span class="section-title">آخر التسجيلات</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>العيادة</th><th>البريد</th><th>التخصص</th><th>الحالة</th><th>التاريخ</th>
+            </tr></thead>
+            <tbody id="recent-tbody"><tr class="loading-row"><td colspan="5">جارٍ التحميل...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ======= CLINICS ======= -->
+      <div class="view" id="view-clinics">
+        <div class="filter-bar">
+          <input class="search-input" type="text" placeholder="بحث بالاسم أو البريد أو التخصص..." oninput="filterClinics(this.value)">
+          <select class="filter-select" onchange="filterByStatus(this.value)">
+            <option value="">كل الحالات</option>
+            <option value="trial">تجريبية</option>
+            <option value="active">مدفوعة</option>
+            <option value="expired">منتهية</option>
+            <option value="cancelled">ملغاة</option>
+          </select>
+          <select class="filter-select" onchange="filterByPublished(this.value)">
+            <option value="">كل المواقع</option>
+            <option value="true">منشورة</option>
+            <option value="false">غير منشورة</option>
+          </select>
+        </div>
+        <div class="section-head">
+          <span class="section-title">جميع العيادات</span>
+          <span class="section-count" id="clinics-count">0</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>العيادة</th><th>البريد</th><th>التخصص</th><th>الموقع</th><th>الاشتراك</th><th>النشر</th><th>الانتهاء</th><th>إجراء</th>
+            </tr></thead>
+            <tbody id="clinics-tbody"><tr class="loading-row"><td colspan="8">جارٍ التحميل...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ======= INVOICES ======= -->
+      <div class="view" id="view-invoices">
+        <div class="section-head">
+          <span class="section-title">سجل الفواتير</span>
+          <span class="section-count" id="inv-count">0</span>
+        </div>
+        <div class="table-wrap" id="invoices-wrap">
+          <div class="empty">لا توجد فواتير بعد — ستظهر هنا بعد ربط بوابة الدفع</div>
+        </div>
+      </div>
+
+      <!-- ======= EXPIRING ======= -->
+      <div class="view" id="view-expiring">
+        <div class="section-head">
+          <span class="section-title">تجارب تنتهي خلال 7 أيام</span>
+          <span class="section-count" id="exp-count">0</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>العيادة</th><th>البريد</th><th>تنتهي في</th><th>الأيام المتبقية</th><th>إجراء</th>
+            </tr></thead>
+            <tbody id="expiring-tbody"><tr class="loading-row"><td colspan="5">جارٍ التحميل...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal تفاصيل العيادة -->
+<div class="modal-backdrop" id="clinic-modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <h3 id="modal-title">تفاصيل العيادة</h3>
+    <div id="modal-body"></div>
+    <div class="modal-actions" id="modal-actions"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let allClinics = [];
+let filteredClinics = [];
+let searchVal = '';
+let statusFilter = '';
+let pubFilter = '';
+const VIEWS = { overview:'نظرة عامة', clinics:'العيادات', invoices:'الفواتير', expiring:'تنتهي قريباً' };
+
+// ============================================================
+// Auth check — أدمن فقط
+// ============================================================
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+
+  // تحقق أنه أدمن
+  const { data: adminRow } = await sb.from('admins').select('id').eq('user_id', session.user.id).single();
+  if (!adminRow) {
+    alert('ليس لديك صلاحية الوصول لهذه الصفحة.');
+    await sb.auth.signOut();
+    window.location.href = 'login.html';
+    return;
+  }
+
+  document.getElementById('admin-email').textContent = session.user.email;
+  loadAll();
+}
+
+// ============================================================
+// تحميل كل البيانات
+// ============================================================
+async function loadAll() {
+  document.getElementById('last-updated').textContent = 'جارٍ التحديث...';
+  await Promise.all([loadStats(), loadClinics(), loadInvoices()]);
+  const now = new Date();
+  document.getElementById('last-updated').textContent =
+    `آخر تحديث: ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+
+async function loadStats() {
+  // إحصائيات من الـ Worker (service_role)
+  const res = await fetch(`${WORKER_URL}/api/admin/stats`, {
+    headers: await authHeader()
+  });
+  if (!res.ok) return;
+  const s = await res.json();
+  document.getElementById('s-total').textContent   = s.total   || 0;
+  document.getElementById('s-trial').textContent   = s.trial   || 0;
+  document.getElementById('s-active').textContent  = s.active  || 0;
+  document.getElementById('s-expired').textContent = (s.expired || 0) + (s.cancelled || 0);
+  document.getElementById('s-pub').textContent     = s.published || 0;
+  document.getElementById('s-today').textContent   = s.new_today || 0;
+  document.getElementById('s-week').textContent    = s.new_week  || 0;
+}
+
+async function loadClinics() {
+  const res = await fetch(`${WORKER_URL}/api/admin/clinics`, {
+    headers: await authHeader()
+  });
+  if (!res.ok) return;
+  allClinics = await res.json();
+
+  // Revenue
+  const { data: invData } = await sb.from('invoices').select('amount').eq('status','paid');
+  const total = (invData || []).reduce((s, r) => s + Number(r.amount), 0);
+  document.getElementById('s-revenue').textContent = total.toLocaleString('ar-EG') + ' ج.م';
+
+  applyFilters();
+  renderRecent();
+  renderExpiring();
+}
+
+async function loadInvoices() {
+  const { data, error } = await sb.from('invoices')
+    .select('*, clinics(clinic_name)')
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  document.getElementById('inv-count').textContent = data?.length || 0;
+  const wrap = document.getElementById('invoices-wrap');
+
+  if (!data || data.length === 0) {
+    wrap.innerHTML = '<div class="empty">لا توجد فواتير بعد — ستظهر هنا بعد ربط بوابة الدفع</div>';
+    return;
+  }
+
+  wrap.innerHTML = data.map(inv => `
+    <div class="inv-row">
+      <div class="inv-left">
+        <span class="inv-name">${inv.clinics?.clinic_name || 'عيادة'}</span>
+        <span class="inv-meta">${inv.payment_method || 'غير محدد'} · ${fmtDate(inv.created_at)}</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="badge ${inv.status === 'paid' ? 'b-paid' : inv.status === 'failed' ? 'b-failed' : 'b-pending'}">${statusAr(inv.status)}</span>
+        <span class="inv-amount">${Number(inv.amount).toLocaleString('ar-EG')} ${inv.currency || 'ج.م'}</span>
+      </div>
+    </div>`).join('');
+}
+
+// ============================================================
+// عرض الجداول
+// ============================================================
+function applyFilters() {
+  filteredClinics = allClinics.filter(c => {
+    const matchSearch = !searchVal ||
+      (c.clinic_name || '').includes(searchVal) ||
+      (c.user_email  || '').includes(searchVal) ||
+      (c.specialty   || '').includes(searchVal);
+    const matchStatus = !statusFilter || getEffectiveStatus(c) === statusFilter;
+    const matchPub    = pubFilter === '' || String(c.is_published) === pubFilter;
+    return matchSearch && matchStatus && matchPub;
+  });
+  document.getElementById('clinics-count').textContent = filteredClinics.length;
+  renderClinicsTable(filteredClinics);
+}
+
+function filterClinics(v)    { searchVal    = v; applyFilters(); }
+function filterByStatus(v)   { statusFilter = v; applyFilters(); }
+function filterByPublished(v){ pubFilter    = v; applyFilters(); }
+
+function renderClinicsTable(list) {
+  const tbody = document.getElementById('clinics-tbody');
+  if (!list.length) { tbody.innerHTML = '<tr class="loading-row"><td colspan="8">لا توجد نتائج</td></tr>'; return; }
+  tbody.innerHTML = list.map(c => {
+    const eff = getEffectiveStatus(c);
+    const daysLeft = c.trial_ends_at ? Math.ceil((new Date(c.trial_ends_at) - new Date()) / 86400000) : null;
+    return `<tr>
+      <td><strong>${c.clinic_name || '—'}</strong><br><span style="font-size:.75rem;color:#64748b">${c.doctor_name || ''}</span></td>
+      <td style="font-size:.8rem">${c.user_email || '—'}</td>
+      <td>${c.specialty || '—'}</td>
+      <td><a href="${WORKER_URL}/site/${c.subdomain}" target="_blank" style="color:#38bdf8;font-size:.75rem">${c.subdomain || '—'}</a></td>
+      <td><span class="badge ${statusBadge(eff)}">${statusArFull(eff)}</span></td>
+      <td><span class="badge ${c.is_published ? 'b-pub' : 'b-unpub'}">${c.is_published ? 'منشور' : 'مسودة'}</span></td>
+      <td style="font-size:.8rem">${daysLeft !== null ? (daysLeft > 0 ? `${daysLeft} يوم` : '<span style="color:#f87171">منتهية</span>') : '—'}</td>
+      <td><div class="actions-cell">
+        <button class="tbl-btn" onclick="openClinicModal('${c.id}')">تفاصيل</button>
+        <button class="tbl-btn danger" onclick="confirmAction('${c.id}','cancel')">إلغاء</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderRecent() {
+  const sorted = [...allClinics].sort((a,b) => new Date(b.created_at) - new Date(a.created_at)).slice(0,5);
+  const tbody = document.getElementById('recent-tbody');
+  if (!sorted.length) { tbody.innerHTML = '<tr class="loading-row"><td colspan="5">لا توجد بيانات</td></tr>'; return; }
+  tbody.innerHTML = sorted.map(c => `<tr>
+    <td><strong>${c.clinic_name || '—'}</strong></td>
+    <td style="font-size:.8rem">${c.user_email || '—'}</td>
+    <td>${c.specialty || '—'}</td>
+    <td><span class="badge ${statusBadge(getEffectiveStatus(c))}">${statusArFull(getEffectiveStatus(c))}</span></td>
+    <td style="font-size:.8rem">${fmtDate(c.created_at)}</td>
+  </tr>`).join('');
+}
+
+function renderExpiring() {
+  const sevenDays = Date.now() + 7 * 86400000;
+  const expiring = allClinics.filter(c =>
+    c.subscription_status === 'trial' &&
+    c.trial_ends_at &&
+    new Date(c.trial_ends_at) > new Date() &&
+    new Date(c.trial_ends_at) <= new Date(sevenDays)
+  ).sort((a,b) => new Date(a.trial_ends_at) - new Date(b.trial_ends_at));
+
+  document.getElementById('exp-count').textContent = expiring.length;
+  const tbody = document.getElementById('expiring-tbody');
+  if (!expiring.length) { tbody.innerHTML = '<tr class="loading-row"><td colspan="5">لا توجد تجارب تنتهي قريباً</td></tr>'; return; }
+  tbody.innerHTML = expiring.map(c => {
+    const days = Math.ceil((new Date(c.trial_ends_at) - new Date()) / 86400000);
+    return `<tr>
+      <td><strong>${c.clinic_name || '—'}</strong></td>
+      <td style="font-size:.8rem">${c.user_email || '—'}</td>
+      <td style="font-size:.8rem">${fmtDate(c.trial_ends_at)}</td>
+      <td><span style="color:${days <= 2 ? '#f87171' : '#fbbf24'};font-weight:700">${days} أيام</span></td>
+      <td><button class="tbl-btn" onclick="sendReminder('${c.user_email}',${days})">إرسال تذكير</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// ============================================================
+// Modal تفاصيل العيادة
+// ============================================================
+function openClinicModal(id) {
+  const c = allClinics.find(x => x.id === id);
+  if (!c) return;
+  const eff = getEffectiveStatus(c);
+  document.getElementById('modal-title').textContent = c.clinic_name || 'عيادة بدون اسم';
+  document.getElementById('modal-body').innerHTML = `
+    <div class="modal-row"><span class="modal-label">البريد</span><span class="modal-value">${c.user_email || '—'}</span></div>
+    <div class="modal-row"><span class="modal-label">الطبيب</span><span class="modal-value">${c.doctor_name || '—'}</span></div>
+    <div class="modal-row"><span class="modal-label">التخصص</span><span class="modal-value">${c.specialty || '—'}</span></div>
+    <div class="modal-row"><span class="modal-label">المدينة</span><span class="modal-value">${c.city || '—'}</span></div>
+    <div class="modal-row"><span class="modal-label">القالب</span><span class="modal-value">${c.template_id || '—'}</span></div>
+    <div class="modal-row"><span class="modal-label">الاشتراك</span><span class="modal-value">${statusArFull(eff)}</span></div>
+    <div class="modal-row"><span class="modal-label">الموقع</span><span class="modal-value">${c.is_published ? 'منشور ✅' : 'مسودة'}</span></div>
+    <div class="modal-row"><span class="modal-label">الرابط</span><span class="modal-value" style="font-size:.8rem">${c.subdomain || '—'}</span></div>
+    <div class="modal-row"><span class="modal-label">انتهاء التجربة</span><span class="modal-value">${c.trial_ends_at ? fmtDate(c.trial_ends_at) : '—'}</span></div>
+    <div class="modal-row"><span class="modal-label">تاريخ الإنشاء</span><span class="modal-value">${fmtDate(c.created_at)}</span></div>
+  `;
+  document.getElementById('modal-actions').innerHTML = `
+    <button class="modal-btn success" onclick="adminActivate('${c.id}')">تفعيل الاشتراك</button>
+    <button class="modal-btn primary" onclick="adminExtendTrial('${c.id}')">تمديد 7 أيام</button>
+    <button class="modal-btn danger"  onclick="adminCancel('${c.id}')">إلغاء الحساب</button>
+    <button class="modal-btn neutral" onclick="closeModal()">إغلاق</button>
+  `;
+  document.getElementById('clinic-modal').classList.add('open');
+}
+function closeModal() { document.getElementById('clinic-modal').classList.remove('open'); }
+
+// ============================================================
+// إجراءات الأدمن على العيادات
+// ============================================================
+async function adminActivate(id) {
+  await updateClinic(id, { subscription_status: 'active' });
+  showToast('✅ تم تفعيل الاشتراك');
+  closeModal(); loadClinics();
+}
+async function adminExtendTrial(id) {
+  const c = allClinics.find(x => x.id === id);
+  const current = c?.trial_ends_at ? new Date(c.trial_ends_at) : new Date();
+  const newEnd = new Date(Math.max(current, new Date()) + 7 * 86400000);
+  await updateClinic(id, { trial_ends_at: newEnd.toISOString(), subscription_status: 'trial' });
+  showToast('✅ تم تمديد التجربة 7 أيام');
+  closeModal(); loadClinics();
+}
+async function adminCancel(id) {
+  if (!confirm('هل أنت متأكد من إلغاء هذا الحساب؟')) return;
+  await updateClinic(id, { subscription_status: 'cancelled', is_published: false });
+  showToast('تم إلغاء الحساب');
+  closeModal(); loadClinics();
+}
+async function confirmAction(id, action) {
+  if (action === 'cancel') adminCancel(id);
+}
+
+async function updateClinic(id, updates) {
+  await fetch(`${WORKER_URL}/api/admin/clinic/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...(await authHeader()) },
+    body: JSON.stringify(updates)
+  });
+}
+
+async function sendReminder(email, days) {
+  await fetch(`${WORKER_URL}/api/send-trial-reminder`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, daysLeft: days })
+  });
+  showToast('✅ تم إرسال التذكير لـ ' + email);
+}
+
+// ============================================================
+// مساعدات
+// ============================================================
+async function authHeader() {
+  const { data: { session } } = await sb.auth.getSession();
+  return { 'Authorization': `Bearer ${session?.access_token || ''}` };
+}
+
+function getEffectiveStatus(c) {
+  if (c.subscription_status === 'active')    return 'active';
+  if (c.subscription_status === 'cancelled') return 'cancelled';
+  if (c.subscription_status === 'expired')   return 'expired';
+  if (c.subscription_status === 'trial') {
+    if (c.trial_ends_at && new Date(c.trial_ends_at) <= new Date()) return 'expired';
+    return 'trial';
+  }
+  return c.subscription_status;
+}
+
+function statusBadge(s) {
+  return { trial:'b-trial', active:'b-active', expired:'b-expired', cancelled:'b-cancelled' }[s] || 'b-cancelled';
+}
+function statusArFull(s) {
+  return { trial:'تجريبية', active:'مدفوعة', expired:'منتهية', cancelled:'ملغاة' }[s] || s;
+}
+function statusAr(s) {
+  return { paid:'مدفوعة', pending:'معلقة', failed:'فشلت', refunded:'مسترجعة' }[s] || s;
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('ar-EG', { year:'numeric', month:'short', day:'numeric' });
+}
+
+function showView(id) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-' + id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.textContent.includes(VIEWS[id])) n.classList.add('active');
+  });
+  document.getElementById('view-title').textContent = VIEWS[id];
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function logout() {
+  await sb.auth.signOut();
+  window.location.href = 'login.html';
+}
+
+init();
+</script>
+</body>
+</html>

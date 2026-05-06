@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>عيادتي — إدارة الأسئلة الشائعة</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f8fafc;color:#1e293b}
+    .header{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 1.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .header-left{display:flex;align-items:center;gap:12px}
+    .back-btn{padding:6px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:.85rem;color:#475569;text-decoration:none}
+    .btn{padding:8px 20px;border-radius:10px;font-size:.875rem;font-weight:600;cursor:pointer;border:none}
+    .btn-primary{background:#1a56db;color:#fff}.btn-primary:hover{background:#1648c0}
+    .btn-outline{background:transparent;border:1.5px solid #1a56db;color:#1a56db}.btn-outline:hover{background:#eff6ff}
+    .btn-sm{padding:5px 12px;font-size:.75rem;border-radius:7px;cursor:pointer;border:none;font-weight:500}
+    .btn-danger{background:#fee2e2;color:#991b1b}.btn-danger:hover{background:#dc2626;color:#fff}
+    .btn-success{background:#dcfce7;color:#166534}.btn-success:hover{background:#16a34a;color:#fff}
+
+    .main{max-width:900px;margin:1.5rem auto;padding:0 1rem}
+
+    /* Tabs categorie */
+    .cat-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:1.25rem}
+    .cat-tab{padding:6px 16px;border-radius:20px;border:1px solid #e2e8f0;background:#fff;font-size:.8rem;color:#64748b;cursor:pointer}
+    .cat-tab.active{background:#1a56db;color:#fff;border-color:#1a56db}
+
+    /* Templates import */
+    .tpl-box{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;margin-bottom:1.5rem}
+    .tpl-box h3{font-size:.95rem;font-weight:600;margin-bottom:.75rem}
+    .tpl-specs{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:1rem}
+    .tpl-spec{padding:6px 14px;border:1.5px solid #e2e8f0;border-radius:20px;font-size:.8rem;cursor:pointer;transition:all .15s;background:#fff;color:#475569}
+    .tpl-spec.active{border-color:#1a56db;background:#eff6ff;color:#1a56db;font-weight:500}
+    .import-note{font-size:.8rem;color:#64748b}
+
+    /* FAQ list */
+    .faq-list{display:flex;flex-direction:column;gap:10px}
+    .faq-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;transition:border-color .15s}
+    .faq-card:hover{border-color:#1a56db}
+    .faq-card.inactive{opacity:.55}
+    .faq-head{display:flex;align-items:center;gap:10px;padding:.875rem 1.25rem;cursor:pointer}
+    .faq-drag{color:#cbd5e1;font-size:1rem;cursor:grab}
+    .faq-q{flex:1;font-size:.9rem;font-weight:500}
+    .faq-cat{font-size:.75rem;padding:3px 10px;border-radius:20px;background:#f1f5f9;color:#475569}
+    .faq-body{padding:0 1.25rem 1rem;display:none}
+    .faq-body.open{display:block}
+    label{display:block;font-size:.8rem;color:#64748b;margin-bottom:4px;margin-top:.875rem}
+    label:first-child{margin-top:0}
+    input[type=text],textarea,select{width:100%;padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.875rem;font-family:inherit;outline:none;transition:border-color .2s}
+    input:focus,textarea:focus,select:focus{border-color:#1a56db}
+    textarea{resize:vertical;min-height:80px}
+    .faq-actions{display:flex;gap:8px;margin-top:1rem;flex-wrap:wrap;align-items:center}
+    .toggle-active{display:flex;align-items:center;gap:6px;font-size:.8rem;color:#64748b;margin-right:auto}
+    .toggle-active input{width:16px;height:16px}
+
+    /* Add new */
+    .add-card{background:#fff;border:2px dashed #e2e8f0;border-radius:12px;padding:1.5rem;text-align:center;cursor:pointer;transition:border-color .15s;margin-bottom:10px}
+    .add-card:hover{border-color:#1a56db}
+    .add-icon{font-size:1.5rem;margin-bottom:6px;color:#94a3b8}
+    .add-text{font-size:.875rem;color:#94a3b8}
+
+    /* Stats bar */
+    .stats-bar{display:flex;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap}
+    .stat{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:.75rem 1.25rem;display:flex;align-items:center;gap:10px}
+    .stat-n{font-size:1.25rem;font-weight:700;color:#1a56db}
+    .stat-l{font-size:.8rem;color:#64748b}
+
+    /* Bot layer card */
+    .layer-card{background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:1.25rem;margin-bottom:1.5rem}
+    .layer-card h3{font-size:.95rem;font-weight:600;margin-bottom:.75rem}
+    .layers{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .layer-opt{padding:.875rem;border:2px solid #e2e8f0;border-radius:10px;cursor:pointer;transition:all .15s;text-align:center}
+    .layer-opt.active{border-color:#1a56db;background:#eff6ff}
+    .layer-opt.active.premium{border-color:#7c3aed;background:#f5f3ff}
+    .layer-name{font-size:.875rem;font-weight:600;margin-bottom:4px}
+    .layer-desc{font-size:.75rem;color:#64748b;line-height:1.4}
+    .premium-badge{font-size:.7rem;padding:2px 6px;background:#7c3aed;color:#fff;border-radius:10px;display:inline-block;margin-top:4px}
+
+    .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 20px;border-radius:30px;font-size:.875rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+    .toast.show{opacity:1}
+  </style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <a href="dashboard.html" class="back-btn">→ الداشبورد</a>
+    <span style="font-size:1rem;font-weight:600">🤖 إدارة بوت الواتساب</span>
+  </div>
+  <button class="btn btn-primary" onclick="saveAll()">💾 حفظ الكل</button>
+</div>
+
+<div class="main">
+
+  <!-- Stats -->
+  <div class="stats-bar">
+    <div class="stat"><span class="stat-n" id="s-total">0</span><span class="stat-l">سؤال وجواب</span></div>
+    <div class="stat"><span class="stat-n" id="s-active">0</span><span class="stat-l">مفعّل</span></div>
+    <div class="stat"><span class="stat-n" id="s-unanswered">0</span><span class="stat-l">سؤال بلا إجابة</span></div>
+  </div>
+
+  <!-- طبقة البوت -->
+  <div class="layer-card">
+    <h3>مستوى البوت</h3>
+    <div class="layers">
+      <div class="layer-opt active" id="layer-faq" onclick="setLayer('faq')">
+        <div class="layer-name">FAQ فقط</div>
+        <div class="layer-desc">يجيب من الأسئلة الشائعة — عند العجز يطلب إعادة الصياغة</div>
+      </div>
+      <div class="layer-opt" id="layer-human" onclick="setLayer('human')">
+        <div class="layer-name">FAQ + سكرتارية</div>
+        <div class="layer-desc">عند العجز يُحوَّل للموظف المسؤول فوراً</div>
+      </div>
+      <div class="layer-opt" id="layer-ai" onclick="setLayer('ai')">
+        <div class="layer-name">AI كامل</div>
+        <div class="layer-desc">ذكاء اصطناعي يفهم كل سؤال ويُكمل الحجز وحده</div>
+        <span class="premium-badge">مدفوعة</span>
+      </div>
+    </div>
+
+    <!-- معلومات السكرتيرة -->
+    <div id="secretary-section" style="margin-top:1rem;display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label>اسم السكرتيرة/الموظف</label>
+          <input type="text" id="sec-name" placeholder="مثال: أحمد">
+        </div>
+        <div>
+          <label>رقم واتساب الموظف</label>
+          <input type="text" id="sec-phone" placeholder="+201XXXXXXXXX">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- استيراد قوالب -->
+  <div class="tpl-box" id="tpl-box">
+    <h3>⚡ استيراد قوالب جاهزة</h3>
+    <div class="tpl-specs" id="tpl-specs"></div>
+    <div style="display:flex;gap:10px;align-items:center">
+      <button class="btn btn-outline" onclick="importTemplates()">استيراد القوالب المحددة</button>
+      <span class="import-note">سيُضاف للأسئلة الحالية — لن يُحذف شيء</span>
+    </div>
+  </div>
+
+  <!-- قائمة الأسئلة -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem">
+    <span style="font-size:.95rem;font-weight:600">أسئلة وأجوبة العيادة</span>
+    <div class="cat-tabs" id="cat-tabs">
+      <button class="cat-tab active" onclick="filterCat('',this)">الكل</button>
+      <button class="cat-tab" onclick="filterCat('أسعار',this)">أسعار</button>
+      <button class="cat-tab" onclick="filterCat('مواعيد',this)">مواعيد</button>
+      <button class="cat-tab" onclick="filterCat('خدمات',this)">خدمات</button>
+      <button class="cat-tab" onclick="filterCat('موقع',this)">موقع</button>
+      <button class="cat-tab" onclick="filterCat('عام',this)">عام</button>
+    </div>
+  </div>
+
+  <div class="add-card" onclick="addNew()">
+    <div class="add-icon">+</div>
+    <div class="add-text">إضافة سؤال وجواب جديد</div>
+  </div>
+
+  <div class="faq-list" id="faq-list"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let clinicId = null;
+let clinic   = null;
+let faqs     = [];
+let catFilter = '';
+let currentLayer = 'faq';
+let selectedSpecs = new Set();
+
+const SPECIALTIES = ['أسنان','جلدية','أطفال','نساء وتوليد','عظام','باطنة','عيون','أنف وأذن','قلب','تغذية'];
+const CATS = ['عام','أسعار','مواعيد','خدمات','موقع','استفسار'];
+
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+
+  const { data } = await sb.from('clinics').select('*').eq('user_id', session.user.id).single();
+  if (!data) return;
+  clinic   = data;
+  clinicId = data.id;
+
+  currentLayer = data.bot_layer || 'faq';
+  setLayer(currentLayer, false);
+
+  if (data.secretary_name)  document.getElementById('sec-name').value  = data.secretary_name;
+  if (data.secretary_phone) document.getElementById('sec-phone').value = data.secretary_phone;
+
+  renderSpecialties();
+  await loadFAQs();
+}
+
+function renderSpecialties() {
+  document.getElementById('tpl-specs').innerHTML = SPECIALTIES.map(s =>
+    `<div class="tpl-spec" onclick="toggleSpec('${s}',this)">${s}</div>`
+  ).join('');
+}
+
+function toggleSpec(s, el) {
+  if (selectedSpecs.has(s)) { selectedSpecs.delete(s); el.classList.remove('active'); }
+  else { selectedSpecs.add(s); el.classList.add('active'); }
+}
+
+async function importTemplates() {
+  if (!selectedSpecs.size) { showToast('اختر تخصصاً واحداً على الأقل'); return; }
+  for (const spec of selectedSpecs) {
+    await fetch(`${WORKER_URL}/api/import-faq-templates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clinicId, specialty: spec })
+    });
+  }
+  await loadFAQs();
+  showToast('✅ تم استيراد القوالب بنجاح');
+}
+
+async function loadFAQs() {
+  const { data } = await sb.from('faq_items')
+    .select('*').eq('clinic_id', clinicId)
+    .order('sort_order').order('created_at');
+  faqs = data || [];
+  renderStats();
+  renderFAQs();
+}
+
+function renderStats() {
+  document.getElementById('s-total').textContent     = faqs.length;
+  document.getElementById('s-active').textContent    = faqs.filter(f=>f.is_active).length;
+  document.getElementById('s-unanswered').textContent = faqs.filter(f=>!f.answer || f.answer.trim().length < 5).length;
+}
+
+function filterCat(cat, btn) {
+  catFilter = cat;
+  document.querySelectorAll('.cat-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderFAQs();
+}
+
+function renderFAQs() {
+  const list = catFilter ? faqs.filter(f=>f.category===catFilter) : faqs;
+  const el = document.getElementById('faq-list');
+  if (!list.length) {
+    el.innerHTML = '<div style="text-align:center;padding:2rem;color:#94a3b8">لا توجد أسئلة — أضف سؤالاً جديداً أو استورد القوالب</div>';
+    return;
+  }
+  el.innerHTML = list.map((f,i) => `
+    <div class="faq-card ${f.is_active?'':'inactive'}" id="faq-${f.id}">
+      <div class="faq-head" onclick="toggleFAQ('${f.id}')">
+        <span class="faq-drag">⠿</span>
+        <span class="faq-q">${f.question || 'سؤال جديد'}</span>
+        <span class="faq-cat">${f.category}</span>
+        <span style="font-size:.85rem;color:#94a3b8">${f.is_active?'':'(معطّل)'}</span>
+        <span style="color:#94a3b8;font-size:.85rem">▾</span>
+      </div>
+      <div class="faq-body" id="body-${f.id}">
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+          <div>
+            <label>السؤال *</label>
+            <input type="text" id="q-${f.id}" value="${escHtml(f.question)}" placeholder="ما سعر...؟">
+          </div>
+          <div>
+            <label>الفئة</label>
+            <select id="cat-${f.id}">
+              ${CATS.map(c=>`<option value="${c}" ${f.category===c?'selected':''}>${c}</option>`).join('')}
+            </select>
+          </div>
+        </div>
+        <label>الإجابة *</label>
+        <textarea id="a-${f.id}" placeholder="الإجابة المفصّلة...">${escHtml(f.answer)}</textarea>
+        <label>كلمات مفتاحية (افصل بمسافة)</label>
+        <input type="text" id="k-${f.id}" value="${escHtml(f.keywords||'')}" placeholder="سعر تكلفة كم">
+        <div class="faq-actions">
+          <label class="toggle-active">
+            <input type="checkbox" id="active-${f.id}" ${f.is_active?'checked':''} onchange="toggleActive('${f.id}')">
+            مفعّل
+          </label>
+          <button class="btn-sm btn-success" onclick="saveFAQ('${f.id}')">حفظ</button>
+          <button class="btn-sm btn-danger" onclick="deleteFAQ('${f.id}')">حذف</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleFAQ(id) {
+  const body = document.getElementById('body-' + id);
+  body.classList.toggle('open');
+}
+
+function escHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+
+async function addNew() {
+  const { data, error } = await sb.from('faq_items').insert({
+    clinic_id: clinicId, question: '', answer: '', keywords: '', category: 'عام', is_active: true
+  }).select().single();
+  if (error) { showToast('خطأ في الإضافة'); return; }
+  faqs.push(data);
+  renderStats();
+  renderFAQs();
+  // افتح الجديد مباشرة
+  setTimeout(() => {
+    const body = document.getElementById('body-' + data.id);
+    if (body) { body.classList.add('open'); document.getElementById('q-' + data.id)?.focus(); }
+  }, 100);
+}
+
+async function saveFAQ(id) {
+  const updates = {
+    question: document.getElementById('q-' + id).value.trim(),
+    answer:   document.getElementById('a-' + id).value.trim(),
+    keywords: document.getElementById('k-' + id).value.trim(),
+    category: document.getElementById('cat-' + id).value,
+    is_active: document.getElementById('active-' + id).checked
+  };
+  if (!updates.question) { showToast('السؤال مطلوب'); return; }
+  const { error } = await sb.from('faq_items').update(updates).eq('id', id);
+  if (error) { showToast('خطأ في الحفظ'); return; }
+  const idx = faqs.findIndex(f => f.id === id);
+  if (idx > -1) faqs[idx] = { ...faqs[idx], ...updates };
+  renderStats();
+  showToast('✅ تم الحفظ');
+}
+
+async function deleteFAQ(id) {
+  if (!confirm('حذف هذا السؤال؟')) return;
+  await sb.from('faq_items').delete().eq('id', id);
+  faqs = faqs.filter(f => f.id !== id);
+  renderStats(); renderFAQs();
+  showToast('تم الحذف');
+}
+
+async function toggleActive(id) {
+  const active = document.getElementById('active-' + id).checked;
+  await sb.from('faq_items').update({ is_active: active }).eq('id', id);
+  const idx = faqs.findIndex(f => f.id === id);
+  if (idx > -1) faqs[idx].is_active = active;
+  renderFAQs(); renderStats();
+}
+
+function setLayer(layer, save = true) {
+  currentLayer = layer;
+  ['faq','human','ai'].forEach(l => {
+    const el = document.getElementById('layer-' + l);
+    if (el) el.classList.toggle('active', l === layer);
+  });
+  document.getElementById('secretary-section').style.display =
+    (layer === 'human') ? 'block' : 'none';
+  if (save) saveLayerConfig();
+}
+
+async function saveLayerConfig() {
+  const updates = { bot_layer: currentLayer };
+  if (currentLayer === 'human') {
+    updates.secretary_name  = document.getElementById('sec-name').value.trim();
+    updates.secretary_phone = document.getElementById('sec-phone').value.trim();
+  }
+  await sb.from('clinics').update(updates).eq('id', clinicId);
+}
+
+async function saveAll() {
+  await saveLayerConfig();
+  showToast('✅ تم حفظ جميع الإعدادات');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>عيادتي — المواعيد</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#f8fafc;color:#1e293b}
+
+    /* Header */
+    .header{background:#fff;border-bottom:1px solid #e2e8f0;padding:0 1.5rem;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+    .header-left{display:flex;align-items:center;gap:12px}
+    .back-btn{padding:6px 14px;border:1px solid #e2e8f0;border-radius:8px;font-size:.85rem;color:#475569;text-decoration:none}
+    .header-title{font-size:1rem;font-weight:600}
+    .wa-status{display:flex;align-items:center;gap:6px;font-size:.8rem;padding:5px 12px;border-radius:20px;border:1px solid #e2e8f0}
+    .wa-dot{width:8px;height:8px;border-radius:50%;background:#94a3b8}
+    .wa-dot.on{background:#16a34a;animation:pulse 2s infinite}
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+    /* Stats */
+    .stats-bar{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;padding:1.25rem 1.5rem;background:#fff;border-bottom:1px solid #e2e8f0}
+    .stat{text-align:center;padding:.75rem;background:#f8fafc;border-radius:10px}
+    .stat-n{font-size:1.5rem;font-weight:700}
+    .stat-l{font-size:.75rem;color:#64748b;margin-top:2px}
+    .c-blue{color:#1a56db}.c-green{color:#16a34a}.c-amber{color:#d97706}.c-red{color:#dc2626}.c-purple{color:#7c3aed}
+
+    /* Main layout */
+    .main{display:grid;grid-template-columns:280px 1fr;height:calc(100vh - 60px - 100px)}
+
+    /* Sidebar calendar */
+    .cal-panel{background:#fff;border-left:1px solid #e2e8f0;padding:1.25rem;overflow-y:auto}
+    .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem}
+    .cal-title{font-size:.95rem;font-weight:600}
+    .cal-nav{padding:4px 8px;border:1px solid #e2e8f0;border-radius:6px;background:transparent;cursor:pointer;font-size:.85rem}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+    .cal-day-label{text-align:center;font-size:.7rem;color:#94a3b8;padding:4px 0;font-weight:500}
+    .cal-day{text-align:center;padding:6px 2px;font-size:.8rem;border-radius:6px;cursor:pointer;transition:all .15s}
+    .cal-day:hover{background:#f1f5f9}
+    .cal-day.today{background:#eff6ff;color:#1a56db;font-weight:600}
+    .cal-day.selected{background:#1a56db;color:#fff;font-weight:600}
+    .cal-day.has-appts::after{content:'•';display:block;font-size:8px;color:#1a56db;line-height:1;margin-top:-2px}
+    .cal-day.selected.has-appts::after{color:#fff}
+    .cal-day.other-month{color:#e2e8f0}
+    .cal-day.closed{color:#e2e8f0;cursor:default}
+
+    /* Filter bar */
+    .filter-bar{display:flex;gap:8px;padding:.75rem 1.5rem;border-bottom:1px solid #f1f5f9;background:#fff}
+    .filter-btn{padding:5px 14px;border-radius:20px;border:1px solid #e2e8f0;background:#fff;font-size:.8rem;color:#64748b;cursor:pointer;transition:all .15s}
+    .filter-btn.active{background:#1a56db;color:#fff;border-color:#1a56db}
+
+    /* Appointments list */
+    .appts-panel{overflow-y:auto;padding:1rem 1.5rem;background:#f8fafc}
+    .date-heading{font-size:.85rem;font-weight:600;color:#64748b;margin:1rem 0 .5rem;display:flex;align-items:center;gap:8px}
+    .date-badge{font-size:.75rem;padding:2px 8px;background:#e2e8f0;border-radius:20px;font-weight:400;color:#475569}
+    .appt-card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:1rem 1.25rem;margin-bottom:8px;display:flex;align-items:center;gap:1rem;transition:border-color .15s}
+    .appt-card:hover{border-color:#1a56db}
+    .appt-time{font-size:1rem;font-weight:700;color:#1a56db;min-width:55px;text-align:center}
+    .appt-divider{width:2px;height:40px;background:#e2e8f0;border-radius:2px}
+    .appt-info{flex:1}
+    .appt-name{font-size:.95rem;font-weight:600}
+    .appt-phone{font-size:.8rem;color:#64748b;margin-top:2px}
+    .appt-actions{display:flex;gap:6px}
+    .act-btn{padding:5px 12px;border-radius:8px;font-size:.75rem;font-weight:500;cursor:pointer;border:1px solid transparent;transition:all .15s}
+    .act-confirm{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+    .act-confirm:hover{background:#16a34a;color:#fff}
+    .act-complete{background:#dbeafe;color:#1e40af;border-color:#bfdbfe}
+    .act-complete:hover{background:#1a56db;color:#fff}
+    .act-cancel{background:#fee2e2;color:#991b1b;border-color:#fecaca}
+    .act-cancel:hover{background:#dc2626;color:#fff}
+    .act-chat{background:#f3e8ff;color:#6b21a8;border-color:#e9d5ff}
+    .act-chat:hover{background:#7c3aed;color:#fff}
+
+    /* Status badges */
+    .status-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.7rem;font-weight:600}
+    .s-pending{background:#fef3c7;color:#92400e}
+    .s-confirmed{background:#dcfce7;color:#166534}
+    .s-cancelled{background:#fee2e2;color:#991b1b}
+    .s-completed{background:#dbeafe;color:#1e40af}
+    .s-no_show{background:#f3f4f6;color:#6b7280}
+
+    /* Chat modal */
+    .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;z-index:200}
+    .modal-bg.open{display:flex}
+    .chat-modal{background:#fff;border-radius:16px 16px 0 0;width:100%;max-width:600px;height:70vh;display:flex;flex-direction:column}
+    .chat-header{padding:1rem 1.25rem;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between}
+    .chat-header h3{font-size:.95rem;font-weight:600}
+    .chat-close{background:transparent;border:none;font-size:1.1rem;cursor:pointer;color:#64748b}
+    .chat-messages{flex:1;overflow-y:auto;padding:1rem;display:flex;flex-direction:column;gap:8px;background:#f8fafc}
+    .msg{max-width:75%;padding:8px 12px;border-radius:10px;font-size:.875rem;line-height:1.5}
+    .msg.in{background:#fff;border:1px solid #e2e8f0;align-self:flex-start;border-radius:0 10px 10px 10px}
+    .msg.out{background:#1a56db;color:#fff;align-self:flex-end;border-radius:10px 0 10px 10px}
+    .msg-time{font-size:.7rem;color:#94a3b8;margin-top:2px}
+    .msg.out .msg-time{color:rgba(255,255,255,.7);text-align:left}
+    .empty-state{text-align:center;padding:2rem;color:#94a3b8;font-size:.9rem}
+
+    /* WhatsApp setup panel */
+    .wa-setup{background:#fff;border:1px solid #fde68a;border-radius:12px;padding:1.25rem;margin:1rem 1.5rem;display:none}
+    .wa-setup.show{display:block}
+    .wa-setup h3{font-size:.95rem;font-weight:600;color:#92400e;margin-bottom:.75rem}
+    .wa-field{display:grid;grid-template-columns:1fr 2fr;gap:10px;align-items:center;margin-bottom:.75rem}
+    .wa-field label{font-size:.85rem;color:#475569}
+    .wa-field input{padding:8px 12px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:.85rem;outline:none;font-family:monospace}
+    .wa-field input:focus{border-color:#1a56db}
+    .wa-save{padding:8px 20px;background:#1a56db;color:#fff;border:none;border-radius:8px;font-size:.875rem;font-weight:600;cursor:pointer}
+
+    /* Toast */
+    .toast{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:10px 20px;border-radius:30px;font-size:.875rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+    .toast.show{opacity:1}
+
+    @media(max-width:700px){.main{grid-template-columns:1fr}.cal-panel{display:none}}
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-left">
+    <a href="dashboard.html" class="back-btn">→ الداشبورد</a>
+    <span class="header-title">📅 إدارة المواعيد</span>
+  </div>
+  <div class="wa-status" id="wa-status">
+    <div class="wa-dot" id="wa-dot"></div>
+    <span id="wa-status-text">التحقق من واتساب...</span>
+    <button onclick="toggleWaSetup()" style="background:transparent;border:none;font-size:.75rem;color:#1a56db;cursor:pointer;margin-right:4px">إعداد</button>
+  </div>
+</div>
+
+<!-- WhatsApp Setup Panel -->
+<div class="wa-setup" id="wa-setup">
+  <h3>⚙️ إعداد واتساب Business API</h3>
+  <div class="wa-field">
+    <label>Phone Number ID</label>
+    <input type="text" id="wa-phone-id" placeholder="من Meta Business Dashboard">
+  </div>
+  <div class="wa-field">
+    <label>Access Token</label>
+    <input type="text" id="wa-token" placeholder="Bearer token من Meta">
+  </div>
+  <div class="wa-field">
+    <label>Verify Token</label>
+    <input type="text" id="wa-verify" placeholder="كلمة سرية تضعها أنت">
+  </div>
+  <div style="margin-top:.75rem;display:flex;gap:10px;align-items:center">
+    <button class="wa-save" onclick="saveWaConfig()">حفظ الإعدادات</button>
+    <span style="font-size:.8rem;color:#64748b">
+      Webhook URL: <code id="webhook-url" style="background:#f1f5f9;padding:2px 6px;border-radius:4px;font-size:.75rem"></code>
+    </span>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stat"><div class="stat-n c-blue"  id="s-total">—</div><div class="stat-l">إجمالي</div></div>
+  <div class="stat"><div class="stat-n c-amber" id="s-today">—</div><div class="stat-l">اليوم</div></div>
+  <div class="stat"><div class="stat-n c-purple"id="s-tomorrow">—</div><div class="stat-l">غداً</div></div>
+  <div class="stat"><div class="stat-n c-blue"  id="s-week">—</div><div class="stat-l">هذا الأسبوع</div></div>
+  <div class="stat"><div class="stat-n c-green" id="s-confirmed">—</div><div class="stat-l">مؤكدة</div></div>
+  <div class="stat"><div class="stat-n c-red"   id="s-cancelled">—</div><div class="stat-l">ملغاة</div></div>
+</div>
+
+<div class="main">
+  <!-- Calendar -->
+  <div class="cal-panel">
+    <div class="cal-header">
+      <button class="cal-nav" onclick="prevMonth()">‹</button>
+      <span class="cal-title" id="cal-title"></span>
+      <button class="cal-nav" onclick="nextMonth()">›</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div style="margin-top:1rem;padding-top:.75rem;border-top:1px solid #f1f5f9;font-size:.8rem;color:#64748b">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">
+        <span style="width:8px;height:8px;border-radius:50%;background:#1a56db;display:inline-block"></span> يوم محدد
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:8px;color:#1a56db">•</span> يوجد مواعيد
+      </div>
+    </div>
+  </div>
+
+  <!-- Appointments list -->
+  <div class="appts-panel">
+    <div class="filter-bar">
+      <button class="filter-btn active" onclick="setFilter('',this)">الكل</button>
+      <button class="filter-btn" onclick="setFilter('pending',this)">قيد الانتظار</button>
+      <button class="filter-btn" onclick="setFilter('confirmed',this)">مؤكدة</button>
+      <button class="filter-btn" onclick="setFilter('completed',this)">مكتملة</button>
+      <button class="filter-btn" onclick="setFilter('cancelled',this)">ملغاة</button>
+    </div>
+    <div id="appts-list"><div class="empty-state">اختر يوماً من التقويم أو شاهد جميع المواعيد</div></div>
+  </div>
+</div>
+
+<!-- Chat Modal -->
+<div class="modal-bg" id="chat-modal">
+  <div class="chat-modal">
+    <div class="chat-header">
+      <div>
+        <h3 id="chat-patient-name">المحادثة</h3>
+        <div id="chat-patient-phone" style="font-size:.8rem;color:#64748b"></div>
+      </div>
+      <button class="chat-close" onclick="closeChat()">✕</button>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="config.js"></script>
+<script>
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let clinicId = null;
+let selectedDate = todayStr();
+let currentFilter = '';
+let calYear, calMonth;
+
+const MONTHS_AR = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const DAYS_AR   = ['أح','إث','ثل','أر','خم','جم','سب'];
+
+// ============================================================
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+
+  const { data } = await sb.from('clinics').select('*').eq('user_id', session.user.id).single();
+  if (!data) { alert('خطأ في تحميل بيانات العيادة'); return; }
+  clinicId = data.id;
+
+  // رابط الـ Webhook
+  document.getElementById('webhook-url').textContent = `${WORKER_URL}/api/whatsapp/webhook`;
+
+  // تحقق من واتساب
+  if (data.wa_phone_number_id && data.wa_access_token) {
+    document.getElementById('wa-dot').classList.add('on');
+    document.getElementById('wa-status-text').textContent = 'واتساب متصل ✓';
+    // تعبئة الحقول
+    document.getElementById('wa-phone-id').value = data.wa_phone_number_id || '';
+    document.getElementById('wa-verify').value   = data.wa_verify_token   || '';
+  } else {
+    document.getElementById('wa-status-text').textContent = 'واتساب غير مفعّل';
+  }
+
+  const now = new Date();
+  calYear  = now.getFullYear();
+  calMonth = now.getMonth();
+
+  await loadStats();
+  renderCalendar();
+  await loadAppointments();
+
+  // Realtime — تحديث فوري عند حجز جديد
+  sb.channel('appointments').on(
+    'postgres_changes',
+    { event: '*', schema: 'public', table: 'appointments', filter: `clinic_id=eq.${clinicId}` },
+    () => { loadStats(); loadAppointments(); }
+  ).subscribe();
+}
+
+// ============================================================
+async function loadStats() {
+  const { data } = await sb.rpc('get_appointment_stats', { p_clinic_id: clinicId });
+  if (!data) return;
+  document.getElementById('s-total').textContent     = data.total     || 0;
+  document.getElementById('s-today').textContent     = data.today     || 0;
+  document.getElementById('s-tomorrow').textContent  = data.tomorrow  || 0;
+  document.getElementById('s-week').textContent      = data.this_week || 0;
+  document.getElementById('s-confirmed').textContent = data.confirmed || 0;
+  document.getElementById('s-cancelled').textContent = data.cancelled || 0;
+}
+
+// ============================================================
+async function loadAppointments() {
+  let query = sb.from('appointments')
+    .select('*')
+    .eq('clinic_id', clinicId)
+    .order('appt_date', { ascending: true })
+    .order('appt_time', { ascending: true });
+
+  if (selectedDate) query = query.eq('appt_date', selectedDate);
+  if (currentFilter) query = query.eq('status', currentFilter);
+
+  const { data } = await query.limit(100);
+  renderAppointments(data || []);
+}
+
+function renderAppointments(list) {
+  const el = document.getElementById('appts-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state">لا توجد مواعيد في هذا اليوم</div>';
+    return;
+  }
+
+  // تجميع حسب التاريخ
+  const byDate = {};
+  list.forEach(a => {
+    if (!byDate[a.appt_date]) byDate[a.appt_date] = [];
+    byDate[a.appt_date].push(a);
+  });
+
+  el.innerHTML = Object.entries(byDate).map(([date, appts]) => `
+    <div class="date-heading">
+      ${formatDateAr(date)}
+      <span class="date-badge">${appts.length} موعد</span>
+    </div>
+    ${appts.map(a => `
+      <div class="appt-card">
+        <div class="appt-time">${formatTime(a.appt_time)}</div>
+        <div class="appt-divider"></div>
+        <div class="appt-info">
+          <div class="appt-name">${a.patient_name}</div>
+          <div class="appt-phone">
+            📱 ${a.patient_phone}
+            <span class="status-badge s-${a.status}" style="margin-right:8px">${statusAr(a.status)}</span>
+          </div>
+          ${a.notes ? `<div style="font-size:.8rem;color:#64748b;margin-top:4px">📝 ${a.notes}</div>` : ''}
+        </div>
+        <div class="appt-actions">
+          ${a.status === 'pending'    ? `<button class="act-btn act-confirm" onclick="updateAppt('${a.id}','confirmed')">تأكيد</button>` : ''}
+          ${a.status === 'confirmed'  ? `<button class="act-btn act-complete" onclick="updateAppt('${a.id}','completed')">مكتمل</button>` : ''}
+          ${a.status !== 'cancelled' && a.status !== 'completed'
+            ? `<button class="act-btn act-cancel" onclick="updateAppt('${a.id}','cancelled')">إلغاء</button>` : ''}
+          <button class="act-btn act-chat" onclick="openChat('${a.patient_name}','${a.patient_phone}')">محادثة</button>
+        </div>
+      </div>
+    `).join('')}
+  `).join('');
+}
+
+// ============================================================
+async function updateAppt(id, status) {
+  const { error } = await sb.from('appointments')
+    .update({ status }).eq('id', id).eq('clinic_id', clinicId);
+  if (error) { showToast('❌ حدث خطأ'); return; }
+  showToast(status === 'confirmed' ? '✅ تم التأكيد' : status === 'completed' ? '✅ تم الإكمال' : 'تم الإلغاء');
+  loadAppointments();
+  loadStats();
+}
+
+// ============================================================
+function renderCalendar() {
+  document.getElementById('cal-title').textContent = `${MONTHS_AR[calMonth]} ${calYear}`;
+  const grid = document.getElementById('cal-grid');
+
+  // رؤوس الأيام
+  let html = DAYS_AR.map(d => `<div class="cal-day-label">${d}</div>`).join('');
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const prevDays = new Date(calYear, calMonth, 0).getDate();
+
+  // أيام الشهر السابق
+  for (let i = firstDay - 1; i >= 0; i--)
+    html += `<div class="cal-day other-month">${prevDays - i}</div>`;
+
+  const todayD = todayStr();
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ds = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const cls = [
+      'cal-day',
+      ds === todayD    ? 'today'    : '',
+      ds === selectedDate ? 'selected' : ''
+    ].filter(Boolean).join(' ');
+    html += `<div class="${cls}" onclick="selectDate('${ds}')" data-date="${ds}">${d}</div>`;
+  }
+
+  grid.innerHTML = html;
+
+  // وضع علامة على الأيام التي فيها مواعيد
+  sb.from('appointments')
+    .select('appt_date')
+    .eq('clinic_id', clinicId)
+    .neq('status', 'cancelled')
+    .gte('appt_date', `${calYear}-${String(calMonth+1).padStart(2,'0')}-01`)
+    .lte('appt_date', `${calYear}-${String(calMonth+1).padStart(2,'0')}-31`)
+    .then(({ data }) => {
+      const dates = new Set((data||[]).map(r => r.appt_date));
+      document.querySelectorAll('.cal-day[data-date]').forEach(el => {
+        if (dates.has(el.dataset.date)) el.classList.add('has-appts');
+      });
+    });
+}
+
+function selectDate(d) {
+  selectedDate = d;
+  renderCalendar();
+  loadAppointments();
+}
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  loadAppointments();
+}
+function prevMonth() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } renderCalendar(); }
+function nextMonth() { calMonth++; if (calMonth > 11) { calMonth = 0;  calYear++; } renderCalendar(); }
+
+// ============================================================
+async function openChat(name, phone) {
+  document.getElementById('chat-patient-name').textContent = name;
+  document.getElementById('chat-patient-phone').textContent = phone;
+  document.getElementById('chat-modal').classList.add('open');
+  document.getElementById('chat-messages').innerHTML = '<div class="empty-state">جارٍ تحميل المحادثة...</div>';
+
+  const { data } = await sb.from('wa_messages')
+    .select('*')
+    .eq('clinic_id', clinicId)
+    .eq('patient_phone', phone)
+    .order('created_at', { ascending: true })
+    .limit(50);
+
+  const msgs = data || [];
+  if (!msgs.length) {
+    document.getElementById('chat-messages').innerHTML = '<div class="empty-state">لا توجد رسائل واتساب لهذا المريض</div>';
+    return;
+  }
+
+  document.getElementById('chat-messages').innerHTML = msgs.map(m => `
+    <div>
+      <div class="msg ${m.direction === 'in' ? 'in' : 'out'}">
+        ${m.content.replace(/\n/g, '<br>')}
+        <div class="msg-time">${formatTime2(m.created_at)}</div>
+      </div>
+    </div>
+  `).join('');
+
+  // اسكرول للأسفل
+  const el = document.getElementById('chat-messages');
+  el.scrollTop = el.scrollHeight;
+}
+function closeChat() { document.getElementById('chat-modal').classList.remove('open'); }
+
+// ============================================================
+async function saveWaConfig() {
+  const { data: { session } } = await sb.auth.getSession();
+  const updates = {
+    wa_phone_number_id: document.getElementById('wa-phone-id').value.trim(),
+    wa_access_token:    document.getElementById('wa-token').value.trim(),
+    wa_verify_token:    document.getElementById('wa-verify').value.trim() || generateToken()
+  };
+  const { error } = await sb.from('clinics').update(updates).eq('id', clinicId);
+  if (error) { showToast('❌ خطأ في الحفظ'); return; }
+  showToast('✅ تم حفظ إعدادات واتساب');
+  document.getElementById('wa-dot').classList.add('on');
+  document.getElementById('wa-status-text').textContent = 'واتساب متصل ✓';
+  document.getElementById('wa-verify').value = updates.wa_verify_token;
+}
+
+function toggleWaSetup() {
+  const el = document.getElementById('wa-setup');
+  el.classList.toggle('show');
+}
+
+// ============================================================
+function generateToken() { return Math.random().toString(36).slice(2,12) + Date.now().toString(36); }
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function formatDateAr(d) {
+  const dt = new Date(d + 'T00:00:00');
+  const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  return `${days[dt.getDay()]} ${dt.getDate()} ${MONTHS_AR[dt.getMonth()]} ${dt.getFullYear()}`;
+}
+function formatTime(t) {
+  if (!t) return '';
+  const [h,m] = t.split(':');
+  const hour = parseInt(h);
+  return `${hour%12||12}:${m} ${hour<12?'ص':'م'}`;
+}
+function formatTime2(ts) {
+  const d = new Date(ts);
+  return `${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function statusAr(s) {
+  return {pending:'قيد الانتظار',confirmed:'مؤكد',cancelled:'ملغى',completed:'مكتمل',no_show:'لم يحضر'}[s]||s;
+}
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+init();
+</script>
+</body>
+</html>
